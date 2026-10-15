@@ -1,6 +1,5 @@
-__pycache__/
-*.pyc
-venv/
-node_modules/
-.env
-datasets/
+   __pycache__/
+   *.pyc
+   node_modules/
+   .env
+   datasets/
