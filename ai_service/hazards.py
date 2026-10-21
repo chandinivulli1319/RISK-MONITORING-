@@ -1,51 +1,44 @@
-def detect_hazards(site, weather):
-    """Look at the site data and weather and return a list of hazards."""
-    hazards = []
+from pathlib import Path
 
-    if site["workers_without_helmet"] > 0:
-        hazards.append({
-            "category": "worker_safety", "severity": "high",
-            "description": f"{site['workers_without_helmet']} workers without helmets",
-            "likelihood": 4, "workers_affected": site["workers_without_helmet"],
-        })
+MODEL_PATH = Path(__file__).parent / "models" / "best.pt"
+_model = None
 
-    for eq in site["faulty_equipment"]:
-        hazards.append({"category": "equipment", "severity": "high",
-                        "description": f"{eq} is faulty"})
 
-    for inc in site["open_incidents"]:
-        hazards.append({"category": "incident", "severity": "medium",
-                        "description": f"Open incident: {inc}"})
+def get_model():
+    """Load the trained YOLO model once and reuse it (loading is slow)."""
+    global _model
+    if _model is None:
+        from ultralytics import YOLO
+        if not MODEL_PATH.exists():
+            raise FileNotFoundError(
+                f"Model file not found. Put best.pt inside {MODEL_PATH.parent}"
+            )
+        _model = YOLO(str(MODEL_PATH))
+    return _model
 
-    if weather["wind_speed"] >= 40:
-        hazards.append({"category": "environment", "severity": "critical",
-                        "description": f"High wind: {weather['wind_speed']} km/h",
-                        "likelihood": 4, "workers_affected": site["workers_total"]})
 
-    if weather["precipitation"] > 5:
-        hazards.append({"category": "environment", "severity": "medium",
-                        "description": "Heavy rain: slippery surfaces"})
+def detect_ppe(image_path, conf=0.35, save_to=None):
+    """Run the trained model on one photo and count what it finds."""
+    import cv2
 
-    if weather["temperature"] >= 38:
-        hazards.append({"category": "environment", "severity": "high",
-                        "description": f"Extreme heat: {weather['temperature']} C"})
+    model = get_model()
+    result = model.predict(str(image_path), conf=conf, verbose=False)[0]
 
-    return hazards
-def ppe_hazards(d):
-    """Convert PPE detection counts into hazards for the risk score."""
-    hazards = []
-    rules = [
-        ("no_helmet", "high", 4, "workers detected without helmets"),
-        ("no_goggle", "medium", 3, "workers detected without eye protection"),
-        ("no_gloves", "medium", 3, "workers detected without gloves"),
-        ("no_boots", "medium", 3, "workers detected without safety boots"),
-    ]
-    for key, severity, likelihood, text in rules:
-        n = d.get(key, 0)
-        if n > 0:
-            hazards.append({
-                "category": "worker_safety", "severity": severity,
-                "description": f"{n} {text}",
-                "likelihood": likelihood, "workers_affected": n,
-            })
-    return hazards
+    counts = {}
+    for box in result.boxes:
+        name = model.names[int(box.cls)].lower()
+        counts[name] = counts.get(name, 0) + 1
+
+    if save_to:
+        cv2.imwrite(str(save_to), result.plot())   # OpenCV saves the photo with boxes drawn
+
+    return {
+        "people": counts.get("person", 0),
+        "helmets": counts.get("helmet", 0),
+        "vests": counts.get("vest", 0),
+        "no_helmet": counts.get("no_helmet", 0),
+        "no_goggle": counts.get("no_goggle", 0),
+        "no_gloves": counts.get("no_gloves", 0),
+        "no_boots": counts.get("no_boots", 0),
+        "all_counts": counts,
+    }

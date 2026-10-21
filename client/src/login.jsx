@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { request } from "./api";
 
-export default function Login({ onLogin }) {
-  const [mode, setMode] = useState("login");
+export default function Login({ onLogin, onBack, initialMode = "login" }) {
+  const [mode, setMode] = useState(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,6 +12,10 @@ export default function Login({ onLogin }) {
   async function submit(e) {
     e.preventDefault();
     setError("");
+    if (mode === "register" && password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     setBusy(true);
     try {
       if (mode === "register") {
@@ -25,14 +29,22 @@ export default function Login({ onLogin }) {
     setBusy(false);
   }
 
-  const input = "w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500";
+  const input =
+    "w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
       <form onSubmit={submit} className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm space-y-4">
+        {onBack && (
+          <button type="button" onClick={onBack} className="text-sm text-slate-500 hover:text-slate-800">
+            Back to home
+          </button>
+        )}
         <div>
           <h1 className="text-2xl font-bold text-slate-900">SiteSentinel</h1>
-          <p className="text-sm text-slate-500">Construction risk monitoring</p>
+          <p className="text-sm text-slate-500">
+            {mode === "login" ? "Log in to your account" : "Create your account"}
+          </p>
         </div>
 
         {mode === "register" && (
@@ -41,8 +53,9 @@ export default function Login({ onLogin }) {
         )}
         <input className={input} type="email" placeholder="Email" value={email}
                onChange={(e) => setEmail(e.target.value)} required />
-        <input className={input} type="password" placeholder="Password" value={password}
-               onChange={(e) => setPassword(e.target.value)} required />
+        <input className={input} type="password"
+               placeholder={mode === "register" ? "Password (6 or more characters)" : "Password"}
+               value={password} onChange={(e) => setPassword(e.target.value)} required />
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

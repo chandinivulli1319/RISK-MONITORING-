@@ -1,24 +1,12 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+__pycache__/
+*.pyc
+venv/
+node_modules/
+.env
+dist/
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# uploaded photos and big downloads (keep ai_service/models/best.pt, it is small)
+server/uploads/
+ai_service/data/
+ai_service/datasets/
+*.zip

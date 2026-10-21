@@ -3,7 +3,9 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid,
 } from "recharts";
-import { request } from "./api";
+import { request, SERVER } from "./api";
+import PhotoAnalysis from "./PhotoAnalysis";
+import Profile from "./Profile";
 
 const levelBadge = {
   Low: "bg-green-100 text-green-800",
@@ -20,7 +22,17 @@ const sevColor = {
   high: "text-orange-700", critical: "text-red-700",
 };
 
+const TABS = [
+  ["analyze", "Analyze"],
+  ["photo", "Photo analysis"],
+  ["history", "History"],
+  ["alerts", "Alerts"],
+  ["profile", "Profile"],
+];
+const NEEDS_SITE = ["analyze", "photo", "history"];
+
 export default function Dashboard({ token, user, onLogout }) {
+  const [me, setMe] = useState(user);              // updated when the profile is saved
   const [tab, setTab] = useState("analyze");
   const [sites, setSites] = useState([]);
   const [siteId, setSiteId] = useState("");
@@ -95,17 +107,19 @@ export default function Dashboard({ token, user, onLogout }) {
       <header className="bg-slate-900 text-white px-6 py-3 flex items-center justify-between">
         <div className="font-bold text-lg">SiteSentinel</div>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-slate-300">{user.name}</span>
+          <button onClick={() => setTab("profile")} className="text-slate-200 hover:text-white hover:underline">
+            {me.name}
+          </button>
           <button onClick={onLogout} className="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">Log out</button>
         </div>
       </header>
 
-      <nav className="bg-white border-b border-slate-200 px-6 flex gap-6">
-        {["analyze", "history", "alerts"].map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-                  className={`py-3 text-sm font-medium capitalize border-b-2 ${
-                    tab === t ? "border-teal-600 text-teal-700" : "border-transparent text-slate-500"}`}>
-            {t === "alerts" ? `Alerts (${alerts.length})` : t}
+      <nav className="bg-white border-b border-slate-200 px-6 flex gap-6 overflow-x-auto" aria-label="Sections">
+        {TABS.map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} aria-current={tab === id ? "page" : undefined}
+                  className={`py-3 text-sm font-medium whitespace-nowrap border-b-2 ${
+                    tab === id ? "border-teal-600 text-teal-700" : "border-transparent text-slate-500"}`}>
+            {id === "alerts" ? `Alerts (${alerts.length})` : label}
           </button>
         ))}
       </nav>
@@ -113,31 +127,33 @@ export default function Dashboard({ token, user, onLogout }) {
       <main className="p-6 max-w-6xl mx-auto space-y-6">
         {error && <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">{error}</div>}
 
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-slate-600">Site</label>
-          <select className="border border-slate-300 rounded-lg px-3 py-2 bg-white text-sm"
-                  value={siteId} onChange={(e) => setSiteId(e.target.value)}>
-            {sites.map((s) => <option key={s.id} value={s.id}>{s.name} - {s.location}</option>)}
-          </select>
-        </div>
+        {NEEDS_SITE.includes(tab) && (
+          <div className="flex items-center gap-3">
+            <label htmlFor="site" className="text-sm text-slate-600">Site</label>
+            <select id="site" className="border border-slate-300 rounded-lg px-3 py-2 bg-white text-sm"
+                    value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+              {sites.map((s) => <option key={s.id} value={s.id}>{s.name} - {s.location}</option>)}
+            </select>
+          </div>
+        )}
 
         {tab === "analyze" && (
           <div className="grid md:grid-cols-3 gap-6">
             <div className={`${card} space-y-4`}>
               <h2 className="font-semibold">Site observations</h2>
               <div>
-                <label className="text-sm text-slate-600">Workers without helmets</label>
-                <input type="number" min="0" className={field} value={helmets}
+                <label className="text-sm text-slate-600" htmlFor="helmets">Workers without helmets</label>
+                <input id="helmets" type="number" min="0" className={field} value={helmets}
                        onChange={(e) => setHelmets(e.target.value)} />
               </div>
               <div>
-                <label className="text-sm text-slate-600">Faulty equipment (one per line)</label>
-                <textarea rows="3" className={field} value={equipment}
+                <label className="text-sm text-slate-600" htmlFor="equipment">Faulty equipment (one per line)</label>
+                <textarea id="equipment" rows="3" className={field} value={equipment}
                           onChange={(e) => setEquipment(e.target.value)} />
               </div>
               <div>
-                <label className="text-sm text-slate-600">Open incidents (one per line)</label>
-                <textarea rows="3" className={field} value={incidents}
+                <label className="text-sm text-slate-600" htmlFor="incidents">Open incidents (one per line)</label>
+                <textarea id="incidents" rows="3" className={field} value={incidents}
                           onChange={(e) => setIncidents(e.target.value)} />
               </div>
               <button onClick={analyze} disabled={loading || !siteId}
@@ -150,13 +166,14 @@ export default function Dashboard({ token, user, onLogout }) {
               {!result && (
                 <div className={`${card} text-slate-500 text-sm`}>
                   Enter the site observations and run the analysis to see the risk score here.
+                  To analyze a photo instead, use the Photo analysis tab.
                 </div>
               )}
 
               {result && (
                 <>
                   <div className={`${card} flex items-center gap-6`}>
-                    <div className={`w-32 h-32 rounded-full border-8 flex flex-col items-center justify-center ${ringColor[result.level]}`}>
+                    <div className={`w-32 h-32 shrink-0 rounded-full border-8 flex flex-col items-center justify-center ${ringColor[result.level]}`}>
                       <span className="text-4xl font-bold">{result.score}</span>
                       <span className="text-xs text-slate-500">of 100</span>
                     </div>
@@ -168,6 +185,7 @@ export default function Dashboard({ token, user, onLogout }) {
                         {result.weather.temperature}&deg;C, wind {result.weather.wind_speed} km/h,
                         rain {result.weather.precipitation} mm
                       </p>
+                      {result.emailSent && <p className="text-sm text-green-700">Alert email sent.</p>}
                     </div>
                   </div>
 
@@ -191,7 +209,7 @@ export default function Dashboard({ token, user, onLogout }) {
                     </div>
                   </div>
 
-                  <div className={card}>
+                  <div className={`${card} overflow-x-auto`}>
                     <h3 className="font-semibold mb-3">Detected hazards ({result.hazards.length})</h3>
                     <table className="w-full text-sm">
                       <thead>
@@ -217,6 +235,15 @@ export default function Dashboard({ token, user, onLogout }) {
           </div>
         )}
 
+        {tab === "photo" && (
+          <PhotoAnalysis
+            token={token}
+            siteId={siteId}
+            onSaved={() => { loadHistory(siteId); loadAlerts(); }}
+            onAuthError={onLogout}
+          />
+        )}
+
         {tab === "history" && (
           <div className="space-y-6">
             <div className={card}>
@@ -235,11 +262,13 @@ export default function Dashboard({ token, user, onLogout }) {
                 </ResponsiveContainer>
               )}
             </div>
-            <div className={card}>
+            <div className={`${card} overflow-x-auto`}>
               <h2 className="font-semibold mb-3">Past analyses</h2>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-slate-500 border-b"><th className="py-2">Date</th><th>Score</th><th>Level</th></tr>
+                  <tr className="text-left text-slate-500 border-b">
+                    <th className="py-2">Date</th><th>Score</th><th>Level</th><th>Type</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {history.map((h) => (
@@ -247,6 +276,11 @@ export default function Dashboard({ token, user, onLogout }) {
                       <td className="py-2">{new Date(h.created_at).toLocaleString()}</td>
                       <td>{h.score}</td>
                       <td><span className={`px-2 py-0.5 rounded-full text-xs ${levelBadge[h.level]}`}>{h.level}</span></td>
+                      <td>
+                        {h.image_path
+                          ? <a className="text-teal-700 underline" href={`${SERVER}${h.image_path}`} target="_blank" rel="noreferrer">Photo</a>
+                          : <span className="text-slate-500">Typed details</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -261,13 +295,20 @@ export default function Dashboard({ token, user, onLogout }) {
             {alerts.length === 0 && <p className="text-sm text-slate-500">No alerts yet.</p>}
             <ul className="space-y-2">
               {alerts.map((a) => (
-                <li key={a.id} className="flex items-center justify-between border border-slate-200 rounded-lg p-3 text-sm">
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 border border-slate-200 rounded-lg p-3 text-sm">
                   <span>{a.message}</span>
-                  <span className="text-slate-400">{new Date(a.created_at).toLocaleString()}</span>
+                  <span className="text-slate-400">
+                    {a.email_sent ? "Email sent, " : "No email, "}
+                    {new Date(a.created_at).toLocaleString()}
+                  </span>
                 </li>
               ))}
             </ul>
           </div>
+        )}
+
+        {tab === "profile" && (
+          <Profile token={token} user={me} onUpdated={setMe} onAuthError={onLogout} />
         )}
       </main>
     </div>
